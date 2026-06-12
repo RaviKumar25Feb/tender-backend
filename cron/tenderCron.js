@@ -4,23 +4,18 @@ const { syncCpppTenders } = require("../services/tender.scraper.service");
 const startTenderCron = () => {
   let isRunning = false;
 
-  console.log("🔥 Cron job initialized (waiting for schedule...)");
+  console.log("🔥 Cron initialized");
 
   cron.schedule("*/5 * * * *", async () => {
-    console.log("⏰ Cron triggered at", new Date().toISOString());
-
-    if (isRunning) {
-      console.log("⚠️ Previous run still executing, skipping...");
-      return;
-    }
+    if (isRunning) return;
 
     isRunning = true;
 
     const startTime = Date.now();
 
-    console.log("🚀 Sync started");
-
     try {
+      console.log("🚀 Sync started");
+
       await syncCpppTenders();
 
       console.log(
@@ -29,7 +24,7 @@ const startTenderCron = () => {
         "sec",
       );
     } catch (err) {
-      console.log("❌ Sync failed");
+      console.log("❌ Sync failed:", err.message);
     } finally {
       isRunning = false;
     }

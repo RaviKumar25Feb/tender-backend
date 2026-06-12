@@ -25,8 +25,14 @@ app.use("/api/tenders", tenderRoutes);
 app.listen(PORT, () => {
   console.log(`App started at port ${PORT}`);
   
-  // start cron AFTER server is up
-  startTenderCron();
+  // 👇 FIX GOES HERE
+  setTimeout(() => {
+    try {
+      startTenderCron();
+    } catch (err) {
+      console.log("Cron failed to start:", err.message);
+    }
+  }, 5000);
 });
 
 //default route
