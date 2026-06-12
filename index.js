@@ -28,7 +28,7 @@ app.listen(PORT, () => {
   // 👇 FIX GOES HERE
   setTimeout(() => {
     try {
-      startTenderCron();
+      // startTenderCron();
     } catch (err) {
       console.log("Cron failed to start:", err.message);
     }
