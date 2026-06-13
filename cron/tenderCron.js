@@ -6,7 +6,7 @@ const startTenderCron = () => {
 
   console.log("🔥 Cron initialized");
 
-  cron.schedule("*/5 * * * *", async () => {
+  cron.schedule("*/2 * * * *", async () => {
     if (isRunning) return;
 
     isRunning = true;
