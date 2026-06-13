@@ -13,8 +13,7 @@ const parseAmount = (value) => {
 };
 
 const syncCpppTenders = async () => {
-  console.log("🚀 Sync started");
-  console.log("📍 Playwright executable path:");
+  console.log("SCRAPER_VERSION_13_JUNE_FIX");
   console.log(chromium.executablePath());
 
   const browser = await chromium.launch({
