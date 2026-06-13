@@ -18,7 +18,8 @@ const syncCpppTenders = async () => {
   console.log(chromium.executablePath());
 
   const browser = await chromium.launch({
-    headless: true,
+    executablePath: chromium.executablePath(),
+    headless: false,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
