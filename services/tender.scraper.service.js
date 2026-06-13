@@ -13,7 +13,19 @@ const parseAmount = (value) => {
 };
 
 const syncCpppTenders = async () => {
-  const browser = await chromium.launch({ headless: true });
+  console.log("🚀 Sync started");
+  console.log("📍 Playwright executable path:");
+  console.log(chromium.executablePath());
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+  });
 
   try {
     const page = await browser.newPage();
