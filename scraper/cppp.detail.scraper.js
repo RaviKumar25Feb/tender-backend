@@ -1,41 +1,93 @@
 const { getBetween, getLastBetween } = require("../utils/cppp.parser");
 
 async function scrapeTenderDetail(page) {
-  const text = await page.locator("body").innerText();
+  try {
+    if (!page || page.isClosed()) {
+      throw new Error("Page already closed");
+    }
 
-  const locationIndex = text.lastIndexOf("Location");
+    await page.waitForLoadState("domcontentloaded");
 
-  return {
-    organisation: getBetween(
+    await page.waitForSelector("body", {
+      timeout: 30000,
+    });
+
+    const text = await page.textContent("body");
+
+    if (!text || !text.trim()) {
+      throw new Error("Empty page content");
+    }
+
+    const tenderId = getBetween(
       text,
-      "Organisation Chain",
-      "Tender Reference Number",
-    ),
-
-    tenderReferenceNumber: getBetween(
-      text,
-      "Tender Reference Number",
       "Tender ID",
-    ),
+      "Withdrawal Allowed",
+    );
 
-    tenderId: getBetween(text, "Tender ID", "Withdrawal Allowed"),
+    if (!tenderId) {
+      console.log("Tender ID not found on page");
+      return null;
+    }
 
-    title: getBetween(text, "Title", "Work Description"),
+    return {
+      organisation: getBetween(
+        text,
+        "Organisation Chain",
+        "Tender Reference Number",
+      ),
 
-    workDescription: getBetween(
-      text,
-      "Work Description",
-      "NDA/Pre Qualification",
-    ),
+      tenderReferenceNumber: getBetween(
+        text,
+        "Tender Reference Number",
+        "Tender ID",
+      ),
 
-    tenderValue: getBetween(text, "Tender Value in ₹", "Product Category"),
+      tenderId,
 
-    location: getLastBetween(text, "Location", "Pincode"),
+      title: getBetween(
+        text,
+        "Title",
+        "Work Description",
+      ),
 
-    emdAmount: getBetween(text, "EMD Amount in ₹", "EMD Exemption Allowed"),
+      workDescription: getBetween(
+        text,
+        "Work Description",
+        "NDA/Pre Qualification",
+      ),
 
-    tenderFee: getBetween(text, "Tender Fee in ₹", "Fee Payable To"),
-  };
+      tenderValue: getBetween(
+        text,
+        "Tender Value in ₹",
+        "Product Category",
+      ),
+
+      location: getLastBetween(
+        text,
+        "Location",
+        "Pincode",
+      ),
+
+      emdAmount: getBetween(
+        text,
+        "EMD Amount in ₹",
+        "EMD Exemption Allowed",
+      ),
+
+      tenderFee: getBetween(
+        text,
+        "Tender Fee in ₹",
+        "Fee Payable To",
+      ),
+    };
+  } catch (error) {
+    console.error(
+      "scrapeTenderDetail error:",
+      error.message,
+    );
+
+    return null;
+  }
 }
 
 module.exports = scrapeTenderDetail;
