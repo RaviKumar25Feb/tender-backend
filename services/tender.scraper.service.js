@@ -12,7 +12,7 @@ const parseAmount = (value) => {
 };
 
 const syncCpppTenders = async () => {
-  console.log("SCRAPER_VERSION_15_JUNE_RENDER_FIX");
+  console.log("SCRAPER_VERSION_16_JUNE_STABLE");
 
   const browser = await chromium.launch({
     headless: true,
@@ -25,25 +25,41 @@ const syncCpppTenders = async () => {
   });
 
   try {
-    const page = await browser.newPage();
+    // =========================
+    // STEP 1: OPEN LIST PAGE
+    // =========================
 
-    page.setDefaultTimeout(30000);
-    page.setDefaultNavigationTimeout(30000);
+    const listPage = await browser.newPage();
 
-    await page.goto("https://eprocure.gov.in/eprocure/app", {
+    listPage.setDefaultTimeout(30000);
+    listPage.setDefaultNavigationTimeout(30000);
+
+    await listPage.goto("https://eprocure.gov.in/eprocure/app", {
       waitUntil: "domcontentloaded",
     });
 
-    await page.waitForSelector("#activeTenders tbody tr");
+    await listPage.waitForSelector("#activeTenders tbody tr");
 
-    const initialRows = page.locator("#activeTenders tbody tr");
-    const rowCount = await initialRows.count();
+    const rowCount = await listPage
+      .locator("#activeTenders tbody tr")
+      .count();
 
     console.log(`Found ${rowCount} tenders`);
 
+    // =========================
+    // STEP 2: PROCESS EACH TENDER
+    // =========================
+
     for (let i = 0; i < rowCount; i++) {
+      let page;
+
       try {
         console.log(`Processing tender ${i + 1}/${rowCount}`);
+
+        page = await browser.newPage();
+
+        page.setDefaultTimeout(30000);
+        page.setDefaultNavigationTimeout(30000);
 
         await page.goto("https://eprocure.gov.in/eprocure/app", {
           waitUntil: "domcontentloaded",
@@ -66,7 +82,7 @@ const syncCpppTenders = async () => {
         const detailData = await scrapeTenderDetail(page);
 
         if (!detailData || !detailData.tenderId) {
-          console.log(`Skipping tender ${i} - no tender id`);
+          console.log(`Skipping tender ${i + 1}`);
           continue;
         }
 
@@ -117,14 +133,28 @@ const syncCpppTenders = async () => {
           },
           {
             upsert: true,
-          },
+          }
         );
 
-        console.log(`Saved tender: ${normalizedData.sourceTenderId}`);
+        console.log(
+          `Saved tender: ${normalizedData.sourceTenderId}`
+        );
       } catch (err) {
-        console.error(`Tender ${i + 1} failed:`, err.message);
-        continue;
+        console.error(
+          `Tender ${i + 1} failed:`,
+          err.message
+        );
+      } finally {
+        try {
+          if (page && !page.isClosed()) {
+            await page.close();
+          }
+        } catch {}
       }
+    }
+
+    if (!listPage.isClosed()) {
+      await listPage.close();
     }
 
     return {

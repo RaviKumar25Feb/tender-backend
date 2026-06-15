@@ -21,11 +21,10 @@ async function scrapeTenderDetail(page) {
     const tenderId = getBetween(
       text,
       "Tender ID",
-      "Withdrawal Allowed",
+      "Withdrawal Allowed"
     );
 
     if (!tenderId) {
-      console.log("Tender ID not found on page");
       return null;
     }
 
@@ -33,13 +32,13 @@ async function scrapeTenderDetail(page) {
       organisation: getBetween(
         text,
         "Organisation Chain",
-        "Tender Reference Number",
+        "Tender Reference Number"
       ),
 
       tenderReferenceNumber: getBetween(
         text,
         "Tender Reference Number",
-        "Tender ID",
+        "Tender ID"
       ),
 
       tenderId,
@@ -47,45 +46,44 @@ async function scrapeTenderDetail(page) {
       title: getBetween(
         text,
         "Title",
-        "Work Description",
+        "Work Description"
       ),
 
       workDescription: getBetween(
         text,
         "Work Description",
-        "NDA/Pre Qualification",
+        "NDA/Pre Qualification"
       ),
 
       tenderValue: getBetween(
         text,
         "Tender Value in ₹",
-        "Product Category",
+        "Product Category"
       ),
 
       location: getLastBetween(
         text,
         "Location",
-        "Pincode",
+        "Pincode"
       ),
 
       emdAmount: getBetween(
         text,
         "EMD Amount in ₹",
-        "EMD Exemption Allowed",
+        "EMD Exemption Allowed"
       ),
 
       tenderFee: getBetween(
         text,
         "Tender Fee in ₹",
-        "Fee Payable To",
+        "Fee Payable To"
       ),
     };
   } catch (error) {
     console.error(
       "scrapeTenderDetail error:",
-      error.message,
+      error.message
     );
-
     return null;
   }
 }
