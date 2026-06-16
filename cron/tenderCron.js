@@ -4,10 +4,11 @@ const { syncCpppTenders } = require("../services/tender.scraper.service");
 const startTenderCron = () => {
   let isRunning = false;
 
-  console.log("🔥 Cron initialized");
-
-  cron.schedule("*/10 * * * *", async () => {
-    if (isRunning) return;
+  const runSync = async () => {
+    if (isRunning) {
+      console.log("⏭️ Previous sync still running. Skipping...");
+      return;
+    }
 
     isRunning = true;
 
@@ -20,14 +21,24 @@ const startTenderCron = () => {
 
       console.log(
         "✅ Sync finished in",
-        (Date.now() - startTime) / 1000,
+        ((Date.now() - startTime) / 1000).toFixed(2),
         "sec",
       );
     } catch (err) {
-      console.log("❌ Sync failed:", err.message);
+      console.error("❌ Sync failed:", err?.message || err);
     } finally {
       isRunning = false;
     }
+  };
+
+  console.log("🔥 Cron initialized");
+
+  // Run once immediately when server starts
+  runSync();
+
+  // Then run every 10 minutes
+  cron.schedule("*/10 * * * *", runSync, {
+    timezone: "Asia/Kolkata",
   });
 };
 

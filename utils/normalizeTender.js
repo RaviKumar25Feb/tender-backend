@@ -1,18 +1,30 @@
 const cleanText = (text) => {
   if (!text) return null;
-  return text.toString().trim().replace(/\s+/g, " ");
+
+  const cleaned = text.toString().replace(/\s+/g, " ").trim();
+
+  return cleaned || null;
 };
 
 const parseNumber = (val) => {
   if (!val) return null;
-  const num = val.toString().replace(/[^0-9]/g, "");
-  return num ? Number(num) : null;
+
+  const num = Number(
+    val
+      .toString()
+      .replace(/,/g, "")
+      .replace(/[^\d.]/g, ""),
+  );
+
+  return isNaN(num) ? null : num;
 };
 
 const parseDate = (val) => {
   if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
+
+  const date = new Date(val);
+
+  return isNaN(date.getTime()) ? null : date;
 };
 
 const extractState = (data) => {
@@ -24,11 +36,9 @@ const extractCity = (data) => {
 };
 
 const generateKeywords = (title = "", desc = "") => {
-  return (title + " " + desc)
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 20);
+  return [
+    ...new Set(`${title} ${desc}`.toLowerCase().split(/\s+/).filter(Boolean)),
+  ].slice(0, 20);
 };
 
 const normalizeTender = (data) => {
@@ -37,7 +47,8 @@ const normalizeTender = (data) => {
     sourceTenderId: data.sourceTenderId || data.tenderId || data.id || null,
 
     sourcePortal: data.sourcePortal || "CPPP",
-    sourceUrl: data.sourceUrl || null,
+
+    sourceUrl: cleanText(data.sourceUrl),
 
     // BASIC INFO
     title: cleanText(data.title),
@@ -45,36 +56,46 @@ const normalizeTender = (data) => {
     description: cleanText(data.description),
 
     organization: cleanText(data.organization),
+
     department: cleanText(data.department),
 
     // LOCATION
     location: cleanText(data.location),
-    city: extractCity(data),
-    state: extractState(data),
-    pincode: data.pincode || null,
+
+    city: cleanText(extractCity(data)),
+
+    state: cleanText(extractState(data)),
+
+    pincode: cleanText(data.pincode),
 
     // DATES
     publishDate: parseDate(data.publishDate),
+
     submissionDate: parseDate(data.submissionDate),
+
     openingDate: parseDate(data.openingDate),
+
     closingDate: parseDate(data.closingDate),
 
     // FINANCIAL
     estimatedCost: parseNumber(data.estimatedCost),
+
     emdAmount: parseNumber(data.emdAmount),
+
     tenderFee: parseNumber(data.tenderFee),
 
-    // DOCUMENTS / BOQ
+    // DOCUMENTS
     documents: Array.isArray(data.documents) ? data.documents : [],
+
     boqItems: Array.isArray(data.boqItems) ? data.boqItems : [],
 
     // META
     keywords: generateKeywords(
-      cleanText(data.title),
-      cleanText(data.description),
+      cleanText(data.title) || "",
+      cleanText(data.description) || "",
     ),
 
-    status: "ACTIVE",
+    status: cleanText(data.status) || "ACTIVE",
 
     rawData: data,
   };

@@ -19,14 +19,22 @@ const createPage = async (browser) => {
   page.setDefaultTimeout(60000);
   page.setDefaultNavigationTimeout(60000);
 
+  await page.setViewportSize({
+    width: 1366,
+    height: 768,
+  });
+
   return page;
 };
 
 const syncCpppTenders = async () => {
-  console.log("SCRAPER_VERSION_16_JUNE_RENDER_STABLE_V2");
+  console.log(
+    "SCRAPER_VERSION_16_JUNE_RENDER_STABLE_V3"
+  );
 
   const browser = await chromium.launch({
     headless: true,
+    timeout: 120000,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -36,16 +44,13 @@ const syncCpppTenders = async () => {
       "--disable-background-networking",
       "--disable-background-timer-throttling",
       "--disable-renderer-backgrounding",
+      "--disable-features=site-per-process",
     ],
   });
 
   let listPage;
 
   try {
-    // =========================
-    // LIST PAGE
-    // =========================
-
     listPage = await createPage(browser);
 
     await listPage.goto(
@@ -67,11 +72,13 @@ const syncCpppTenders = async () => {
       .locator("#activeTenders tbody tr")
       .count();
 
-    console.log(`Found ${rowCount} tenders`);
+    if (!rowCount) {
+      throw new Error(
+        "No tenders found on listing page"
+      );
+    }
 
-    // =========================
-    // PROCESS TENDERS
-    // =========================
+    console.log(`Found ${rowCount} tenders`);
 
     for (let i = 0; i < rowCount; i++) {
       let page = null;
@@ -123,9 +130,11 @@ const syncCpppTenders = async () => {
           timeout: 60000,
         });
 
-        // CPPP is flaky.
-        // Do NOT use waitForNavigation().
-        await page.waitForTimeout(5000);
+        await page.waitForSelector("body", {
+          timeout: 60000,
+        });
+
+        await page.waitForTimeout(15000);
 
         const detailData =
           await scrapeTenderDetail(page);
@@ -225,7 +234,7 @@ const syncCpppTenders = async () => {
       } catch (err) {
         console.error(
           `Tender ${i + 1} failed:`,
-          err.message
+          err?.message || err
         );
 
         console.log(
@@ -238,7 +247,9 @@ const syncCpppTenders = async () => {
             page &&
             !page.isClosed()
           ) {
-            await page.close();
+            await page.close({
+              runBeforeUnload: false,
+            });
           }
         } catch {}
       }
@@ -261,7 +272,9 @@ const syncCpppTenders = async () => {
         listPage &&
         !listPage.isClosed()
       ) {
-        await listPage.close();
+        await listPage.close({
+          runBeforeUnload: false,
+        });
       }
     } catch {}
 
