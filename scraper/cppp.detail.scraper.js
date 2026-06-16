@@ -3,8 +3,10 @@ const { getBetween, getLastBetween } = require("../utils/cppp.parser");
 async function scrapeTenderDetail(page) {
   try {
     if (!page || page.isClosed()) {
-      return null;
+      throw new Error("Page already closed");
     }
+
+    await page.waitForLoadState("domcontentloaded");
 
     await page.waitForSelector("body", {
       timeout: 30000,
@@ -82,7 +84,6 @@ async function scrapeTenderDetail(page) {
       "scrapeTenderDetail error:",
       error.message
     );
-
     return null;
   }
 }

@@ -1,12 +1,16 @@
 const cron = require("node-cron");
-const { syncCpppTenders } = require("../services/tender.scraper.service");
+const {
+  syncCpppTenders,
+} = require("../services/tender.scraper.service");
 
 const startTenderCron = () => {
   let isRunning = false;
 
   const runSync = async () => {
     if (isRunning) {
-      console.log("⏭️ Previous sync still running. Skipping...");
+      console.log(
+        "⏭️ Previous sync still running. Skipping..."
+      );
       return;
     }
 
@@ -22,10 +26,13 @@ const startTenderCron = () => {
       console.log(
         "✅ Sync finished in",
         ((Date.now() - startTime) / 1000).toFixed(2),
-        "sec",
+        "sec"
       );
     } catch (err) {
-      console.error("❌ Sync failed:", err?.message || err);
+      console.error(
+        "❌ Sync failed:",
+        err?.message || err
+      );
     } finally {
       isRunning = false;
     }
