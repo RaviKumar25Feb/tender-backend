@@ -13,8 +13,17 @@ const parseAmount = (value) => {
   return isNaN(num) ? null : num;
 };
 
+const createPage = async (browser) => {
+  const page = await browser.newPage();
+
+  page.setDefaultTimeout(60000);
+  page.setDefaultNavigationTimeout(60000);
+
+  return page;
+};
+
 const syncCpppTenders = async () => {
-  console.log("SCRAPER_VERSION_16_JUNE_RENDER_STABLE");
+  console.log("SCRAPER_VERSION_16_JUNE_RENDER_STABLE_V2");
 
   const browser = await chromium.launch({
     headless: true,
@@ -31,22 +40,19 @@ const syncCpppTenders = async () => {
   });
 
   let listPage;
-  let detailPage;
 
   try {
     // =========================
     // LIST PAGE
     // =========================
 
-    listPage = await browser.newPage();
-
-    listPage.setDefaultTimeout(60000);
-    listPage.setDefaultNavigationTimeout(60000);
+    listPage = await createPage(browser);
 
     await listPage.goto(
       "https://eprocure.gov.in/eprocure/app",
       {
         waitUntil: "domcontentloaded",
+        timeout: 60000,
       }
     );
 
@@ -63,13 +69,13 @@ const syncCpppTenders = async () => {
 
     console.log(`Found ${rowCount} tenders`);
 
-    // Single reusable page
-    detailPage = await browser.newPage();
-
-    detailPage.setDefaultTimeout(60000);
-    detailPage.setDefaultNavigationTimeout(60000);
+    // =========================
+    // PROCESS TENDERS
+    // =========================
 
     for (let i = 0; i < rowCount; i++) {
+      let page = null;
+
       try {
         console.log(
           `Processing tender ${i + 1}/${rowCount}`
@@ -80,8 +86,15 @@ const syncCpppTenders = async () => {
           browser.isConnected()
         );
 
-        // Reload homepage fresh
-        await detailPage.goto(
+        if (!browser.isConnected()) {
+          throw new Error(
+            "Browser disconnected"
+          );
+        }
+
+        page = await createPage(browser);
+
+        await page.goto(
           "https://eprocure.gov.in/eprocure/app",
           {
             waitUntil: "domcontentloaded",
@@ -89,14 +102,14 @@ const syncCpppTenders = async () => {
           }
         );
 
-        await detailPage.waitForSelector(
+        await page.waitForSelector(
           "#activeTenders tbody tr",
           {
             timeout: 60000,
           }
         );
 
-        const rows = detailPage.locator(
+        const rows = page.locator(
           "#activeTenders tbody tr"
         );
 
@@ -110,15 +123,12 @@ const syncCpppTenders = async () => {
           timeout: 60000,
         });
 
-        // CPPP is flaky. Avoid waitForNavigation.
-        await detailPage.waitForLoadState(
-          "domcontentloaded"
-        );
-
-        await detailPage.waitForTimeout(3000);
+        // CPPP is flaky.
+        // Do NOT use waitForNavigation().
+        await page.waitForTimeout(5000);
 
         const detailData =
-          await scrapeTenderDetail(detailPage);
+          await scrapeTenderDetail(page);
 
         if (
           !detailData ||
@@ -132,6 +142,7 @@ const syncCpppTenders = async () => {
 
         const rawInput = {
           sourcePortal: "CPPP",
+
           sourceTenderId:
             detailData.tenderId,
 
@@ -221,8 +232,15 @@ const syncCpppTenders = async () => {
           "Browser alive after error:",
           browser.isConnected()
         );
-
-        continue;
+      } finally {
+        try {
+          if (
+            page &&
+            !page.isClosed()
+          ) {
+            await page.close();
+          }
+        } catch {}
       }
     }
 
@@ -238,15 +256,6 @@ const syncCpppTenders = async () => {
 
     throw error;
   } finally {
-    try {
-      if (
-        detailPage &&
-        !detailPage.isClosed()
-      ) {
-        await detailPage.close();
-      }
-    } catch {}
-
     try {
       if (
         listPage &&
