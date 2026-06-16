@@ -6,13 +6,15 @@ const Tender = require("../models/tender.model");
 const parseAmount = (value) => {
   if (!value) return null;
 
-  const num = Number(value.toString().replace(/,/g, "").trim());
+  const num = Number(
+    value.toString().replace(/,/g, "").trim()
+  );
 
   return isNaN(num) ? null : num;
 };
 
 const syncCpppTenders = async () => {
-  console.log("SCRAPER_VERSION_16_JUNE_STABLE");
+  console.log("SCRAPER_VERSION_16_JUNE_RENDER_STABLE");
 
   const browser = await chromium.launch({
     headless: true,
@@ -21,24 +23,39 @@ const syncCpppTenders = async () => {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
     ],
   });
 
+  let listPage;
+  let detailPage;
+
   try {
     // =========================
-    // STEP 1: OPEN LIST PAGE
+    // LIST PAGE
     // =========================
 
-    const listPage = await browser.newPage();
+    listPage = await browser.newPage();
 
-    listPage.setDefaultTimeout(30000);
-    listPage.setDefaultNavigationTimeout(30000);
+    listPage.setDefaultTimeout(60000);
+    listPage.setDefaultNavigationTimeout(60000);
 
-    await listPage.goto("https://eprocure.gov.in/eprocure/app", {
-      waitUntil: "domcontentloaded",
-    });
+    await listPage.goto(
+      "https://eprocure.gov.in/eprocure/app",
+      {
+        waitUntil: "domcontentloaded",
+      }
+    );
 
-    await listPage.waitForSelector("#activeTenders tbody tr");
+    await listPage.waitForSelector(
+      "#activeTenders tbody tr",
+      {
+        timeout: 60000,
+      }
+    );
 
     const rowCount = await listPage
       .locator("#activeTenders tbody tr")
@@ -46,84 +63,139 @@ const syncCpppTenders = async () => {
 
     console.log(`Found ${rowCount} tenders`);
 
-    // =========================
-    // STEP 2: PROCESS EACH TENDER
-    // =========================
+    // Single reusable page
+    detailPage = await browser.newPage();
+
+    detailPage.setDefaultTimeout(60000);
+    detailPage.setDefaultNavigationTimeout(60000);
 
     for (let i = 0; i < rowCount; i++) {
-      let page;
-
       try {
-        console.log(`Processing tender ${i + 1}/${rowCount}`);
+        console.log(
+          `Processing tender ${i + 1}/${rowCount}`
+        );
 
-        page = await browser.newPage();
+        console.log(
+          "Browser connected:",
+          browser.isConnected()
+        );
 
-        page.setDefaultTimeout(30000);
-        page.setDefaultNavigationTimeout(30000);
+        // Reload homepage fresh
+        await detailPage.goto(
+          "https://eprocure.gov.in/eprocure/app",
+          {
+            waitUntil: "domcontentloaded",
+            timeout: 60000,
+          }
+        );
 
-        await page.goto("https://eprocure.gov.in/eprocure/app", {
-          waitUntil: "domcontentloaded",
+        await detailPage.waitForSelector(
+          "#activeTenders tbody tr",
+          {
+            timeout: 60000,
+          }
+        );
+
+        const rows = detailPage.locator(
+          "#activeTenders tbody tr"
+        );
+
+        const row = rows.nth(i);
+
+        await row.scrollIntoViewIfNeeded();
+
+        const link = row.locator("a");
+
+        await link.click({
+          timeout: 60000,
         });
 
-        await page.waitForSelector("#activeTenders tbody tr");
+        // CPPP is flaky. Avoid waitForNavigation.
+        await detailPage.waitForLoadState(
+          "domcontentloaded"
+        );
 
-        const rows = page.locator("#activeTenders tbody tr");
+        await detailPage.waitForTimeout(3000);
 
-        await Promise.all([
-          page.waitForNavigation({
-            waitUntil: "domcontentloaded",
-            timeout: 30000,
-          }),
-          rows.nth(i).locator("a").click(),
-        ]);
+        const detailData =
+          await scrapeTenderDetail(detailPage);
 
-        await page.waitForTimeout(2000);
-
-        const detailData = await scrapeTenderDetail(page);
-
-        if (!detailData || !detailData.tenderId) {
-          console.log(`Skipping tender ${i + 1}`);
+        if (
+          !detailData ||
+          !detailData.tenderId
+        ) {
+          console.log(
+            `Skipping tender ${i + 1} (No Tender ID)`
+          );
           continue;
         }
 
         const rawInput = {
           sourcePortal: "CPPP",
-          sourceTenderId: detailData.tenderId,
-          tenderReferenceNumber: detailData.tenderReferenceNumber,
+          sourceTenderId:
+            detailData.tenderId,
+
+          tenderReferenceNumber:
+            detailData.tenderReferenceNumber,
 
           title: detailData.title,
           brief: detailData.brief,
-          description: detailData.description,
+          description:
+            detailData.description,
 
-          workDescription: detailData.workDescription,
+          workDescription:
+            detailData.workDescription,
 
-          organization: detailData.organisation,
-          department: detailData.department,
+          organization:
+            detailData.organisation,
 
-          location: detailData.location,
+          department:
+            detailData.department,
+
+          location:
+            detailData.location,
+
           city: detailData.city,
           state: detailData.state,
 
-          estimatedCost: parseAmount(detailData.tenderValue),
-          emdAmount: parseAmount(detailData.emdAmount),
-          tenderFee: parseAmount(detailData.tenderFee),
+          estimatedCost: parseAmount(
+            detailData.tenderValue
+          ),
 
-          publishDate: detailData.publishDate,
-          submissionDate: detailData.submissionDate,
-          closingDate: detailData.closingDate,
+          emdAmount: parseAmount(
+            detailData.emdAmount
+          ),
 
-          documents: detailData.documents || [],
-          boqItems: detailData.boqItems || [],
+          tenderFee: parseAmount(
+            detailData.tenderFee
+          ),
+
+          publishDate:
+            detailData.publishDate,
+
+          submissionDate:
+            detailData.submissionDate,
+
+          closingDate:
+            detailData.closingDate,
+
+          documents:
+            detailData.documents || [],
+
+          boqItems:
+            detailData.boqItems || [],
 
           rawData: detailData,
         };
 
-        const normalizedData = normalizeTender(rawInput);
+        const normalizedData =
+          normalizeTender(rawInput);
 
         await Tender.updateOne(
           {
             sourcePortal: "CPPP",
-            sourceTenderId: normalizedData.sourceTenderId,
+            sourceTenderId:
+              normalizedData.sourceTenderId,
           },
           {
             $set: {
@@ -144,17 +216,14 @@ const syncCpppTenders = async () => {
           `Tender ${i + 1} failed:`,
           err.message
         );
-      } finally {
-        try {
-          if (page && !page.isClosed()) {
-            await page.close();
-          }
-        } catch {}
-      }
-    }
 
-    if (!listPage.isClosed()) {
-      await listPage.close();
+        console.log(
+          "Browser alive after error:",
+          browser.isConnected()
+        );
+
+        continue;
+      }
     }
 
     return {
@@ -162,10 +231,36 @@ const syncCpppTenders = async () => {
       message: "Sync completed successfully",
     };
   } catch (error) {
-    console.error("Sync error:", error);
+    console.error(
+      "CPPP Sync Error:",
+      error
+    );
+
     throw error;
   } finally {
-    await browser.close();
+    try {
+      if (
+        detailPage &&
+        !detailPage.isClosed()
+      ) {
+        await detailPage.close();
+      }
+    } catch {}
+
+    try {
+      if (
+        listPage &&
+        !listPage.isClosed()
+      ) {
+        await listPage.close();
+      }
+    } catch {}
+
+    try {
+      if (browser.isConnected()) {
+        await browser.close();
+      }
+    } catch {}
   }
 };
 
